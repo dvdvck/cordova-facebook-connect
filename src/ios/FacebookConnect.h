@@ -9,31 +9,33 @@
 #import <Foundation/Foundation.h>
 #import <Cordova/CDVPlugin.h>
 #import <FacebookSDK/FacebookSDK.h>
-#import <FacebookSDK/Facebook.h>
 
-@interface FacebookConnect : CDVPlugin <FBSessionDelegate, FBRequestDelegate, FBDialogDelegate> {
-}
+@interface FacebookConnect : CDVPlugin {}
 
 #pragma mark - Properties
 
 @property (nonatomic, retain) NSMutableDictionary *callbackIds;
-@property (nonatomic, copy) NSString *appId;
-@property (nonatomic, retain) Facebook *facebook;
 @property (nonatomic, retain) NSMutableDictionary *facebookRequests;
 @property (nonatomic, retain) NSDateFormatter *dateFormatter;
+/* Since sessionHandler are executed for all changes on state session property
+we need to differenciate those executions which are thrown by 
+openSession and reauthorizeSession methods
+*/
+@property BOOL openSessionCallback;
+@property BOOL reauthorizeSessionCallback;
 
 #pragma mark - Instance methods
 
-- (void)initWithAppId:(NSMutableArray *)arguments withDict:(NSMutableDictionary*)options;
-- (void)login:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
-- (void)requestWithGraphPath:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
-- (void)logout:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
-- (void)dialog:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
+- (void) openSession:(CDVInvokedUrlCommand *)command;
+- (void) reauthorizeSession:(CDVInvokedUrlCommand *)command;
+//- (void)requestWithGraphPath:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
+- (void) closeSession:(CDVInvokedUrlCommand *)command;
+//- (void)dialog:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
 
 @end
 
 #pragma mark - Logging tools
-
+#define DEBUG
 #ifdef DEBUG
 #   define DLog(fmt, ...) NSLog((@"%s [Line %d] " fmt), __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__);
 #else

@@ -9,34 +9,110 @@
 (function(cordova) {
 
 	function FacebookConnect() {}
-	var service = 'FacebookConnect';
+	var service = 'FacebookConnect',
+	openSession = false,
 
-	FacebookConnect.prototype.initWithAppId = function(appId, callback) {
-		if(!appId) return false;
+    FBSessionDefaultAudienceNone                = 0,
+	FBSessionDefaultAudienceOnlyMe              = 10,
+    FBSessionDefaultAudienceFriends             = 20,
+    FBSessionDefaultAudienceEveryone            = 30;
+
+    /*! No audience needed; this value is useful for cases where data will only be read from Facebook */
+    FacebookConnect.prototype.FBSessionDefaultAudienceNone                = FBSessionDefaultAudienceNone;
+    /*! Indicates that only the user is able to see posts made by the application */
+	FacebookConnect.prototype.FBSessionDefaultAudienceOnlyMe              = FBSessionDefaultAudienceOnlyMe;
+    /*! Indicates that the user's friends are able to see posts made by the application */
+    FacebookConnect.prototype.FBSessionDefaultAudienceFriends             = FBSessionDefaultAudienceFriends;
+    /*! Indicates that all Facebook users are able to see posts made by the application */
+    FacebookConnect.prototype.FBSessionDefaultAudienceEveryone            = FBSessionDefaultAudienceEveryone;
+
+	/**
+	From active session, reauthorize it addding this permissions
+	This actions depends on type of read or publish permissions
+
+	@throws Error if there isnt an active session
+	@throws Error if there isnt at least one permission
+	@param permissions array list of permissions. Default: []
+	@param audience int set the audience for those permissions, when is FBSessionDefaultAudienceNone
+		all the permissions need to be for read. Default: FBSessionDefaultAudienceNone
+	*/
+	FacebookConnect.prototype.reauthorizeSession = function(options, callback) {
+		// if(!openSession){
+		// 	throw Error('There is not an active Session :(');
+		// }
+		var config = [];
+
+		//permissions
+		config.push(options && options.permissions instanceof Array?options.permissions:[]);
+		//audience?
+		config.push((function(audience){
+			if( options && typeof options.audience ==='number' ){
+				switch(options.audience){
+					case FBSessionDefaultAudienceEveryone:
+					case FBSessionDefaultAudienceFriends:
+					case FBSessionDefaultAudienceOnlyMe:
+						audience = options.audience;
+				}
+			}
+			return audience;
+		}(FBSessionDefaultAudienceNone)));
 
 		var _callback = function(result) {
 			//console.log('FacebookConnect.initWithAppId: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
 
-		return cordova.exec(_callback, _callback, service, 'initWithAppId', [{appId: appId}]);
-
+		var _errCallback = function(err){
+			//some internal handlers here!
+			if(typeof callback == 'function') callback.apply(null, arguments);
+		};
+		console.log('FacebookConnect.reauthorize: %o', config);
+		return cordova.exec(_callback, _errCallback, service, 'reauthorizeSession', config);
 	};
 
-	FacebookConnect.prototype.login = function(options, callback) {
-		if(!options) options = {};
+	/**
+	Open a FBSession with read permissions only
+	@param permissions array list of permissions. Default: []
+	@param showUI array if it should shows UIlogin to open a session. Default: true
+	*/
+	FacebookConnect.prototype.openSession = function(options, callback) {
+		var config = [];
 
-		var config = {
-			permissions: options.permissions || ['email'],
-			appId: options.appId || ''
-		};
+		//permissions
+		config.push(options && options.permissions instanceof Array?options.permissions:[]);
+		//showUI
+		config.push(function(valueSet){
+			return valueSet?options.showUI:true;
+		}(options && typeof options.showUI === 'boolean'));
+		
+		callback = options && typeof options === "function"? options:callback; 
 
-		var _callback = function(result) {
+		var _callback = function() {
+			openSession = true;
 			//console.log('FacebookConnect.login: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
 
-		return cordova.exec(_callback, _callback, service, 'login', [config]);
+		var _errCallback = function(){
+			//some internal handlers here!
+			openSession = false;
+			if(typeof callback == 'function') callback.apply(null, arguments);
+		};
+
+		console.log('FacebookConnect.openSession: %o', config);
+		return cordova.exec(_callback, _errCallback, service, 'openSession', config);
+
+	};
+
+	FacebookConnect.prototype.closeSession = function(callback) {
+
+		var _callback = function(logout) {
+			openSession = false;
+			//console.log('FacebookConnect.logout: %o', arguments);
+			if(typeof callback == 'function') callback.apply(null, arguments);
+		};
+
+		return cordova.exec(_callback, _callback, service, 'closeSession', []);
 
 	};
 
@@ -69,17 +145,6 @@
 		};
 
 		return cordova.exec(_callback, _callback, service, 'requestWithGraphPath', [{path: path, options: options, httpMethod: httpMethod}]);
-
-	};
-
-	FacebookConnect.prototype.logout = function(callback) {
-
-		var _callback = function(logout) {
-			//console.log('FacebookConnect.logout: %o', arguments);
-			if(typeof callback == 'function') callback.apply(null, arguments);
-		};
-
-		return cordova.exec(_callback, _callback, service, 'logout', []);
 
 	};
 
