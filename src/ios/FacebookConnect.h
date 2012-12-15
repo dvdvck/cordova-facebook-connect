@@ -8,7 +8,10 @@
 
 #import <Foundation/Foundation.h>
 #import <Cordova/CDVPlugin.h>
-#import <FacebookSDK/FacebookSDK.h>
+
+//Until dialog component gets updated
+#import "Facebook.h"
+//#import <FacebookSDK/FacebookSDK.h>
 
 @interface FacebookConnect : CDVPlugin {}
 
@@ -30,7 +33,7 @@ openSession and reauthorizeSession methods
 - (void) reauthorizeSession:(CDVInvokedUrlCommand *)command;
 //- (void)requestWithGraphPath:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
 - (void) closeSession:(CDVInvokedUrlCommand *)command;
-//- (void)dialog:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options;
+- (void) dialog:(CDVInvokedUrlCommand *)command;
 
 @end
 

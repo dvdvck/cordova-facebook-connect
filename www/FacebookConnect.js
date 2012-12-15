@@ -57,12 +57,12 @@
 			return audience;
 		}(FBSessionDefaultAudienceNone)));
 
-		var _callback = function(result) {
+		var _callback = function() {
 			//console.log('FacebookConnect.initWithAppId: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
 
-		var _errCallback = function(err){
+		var _errCallback = function(){
 			//some internal handlers here!
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
@@ -106,7 +106,7 @@
 
 	FacebookConnect.prototype.closeSession = function(callback) {
 
-		var _callback = function(logout) {
+		var _callback = function() {
 			openSession = false;
 			//console.log('FacebookConnect.logout: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
@@ -139,7 +139,7 @@
 		}
 		httpMethod = httpMethod || 'GET';
 
-		var _callback = function(result) {
+		var _callback = function() {
 			//console.log('FacebookConnect.requestWithGraphPath: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
@@ -148,15 +148,30 @@
 
 	};
 
-	FacebookConnect.prototype.dialog = function(method, options, callback) {
+	FacebookConnect.prototype.dialog = function(method, params, callback) {
+		var config = [];
+		if(typeof method === 'function'){
+			callback = method;
+			method = "apprequests";
+			params = {};
+		}
+		if(typeof method === 'object'){
+			callback = params;
+			params = method;
+			method = "apprequests";
+		}
 
-		var _callback = function(result) {
+		//method
+		config.push(method);
+		//params
+		config.push(params);
+
+		var _callback = function() {
 			//console.log('FacebookConnect.dialog: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
-
-		return cordova.exec(_callback, _callback, service, 'dialog', [{method: method, params: options}]);
-
+		//sueño ataca de nuevo ...
+		return cordova.exec(_callback, _callback, service, 'dialog', config);
 	};
 
 	cordova.addConstructor(function() {

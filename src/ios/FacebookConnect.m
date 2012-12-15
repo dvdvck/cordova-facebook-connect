@@ -8,11 +8,10 @@
 
 #import "FacebookConnect.h"
 #import <Cordova/JSONKit.h>
+#import "FBSessionDelegateDummy.h"
+// #import "Facebook.h"
 
 NSString *const kFunctionDialog = @"dialog";
-NSString *const kFunctionOpen = @"openSession";
-NSString *const kFunctionClose = @"closeSession";
-NSString *const kFunctionReauthorize = @"reauthorizeSession";
 
 @implementation FacebookConnect
 
@@ -90,19 +89,22 @@ NSString *const kFunctionReauthorize = @"reauthorizeSession";
 							 forKey:[self.callbackIds valueForKey:@"requestWithGraphPath"]];
 
 }
-
-- (void)dialog:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
-	DLog(@"%@:%@\n withDict:%@", kFunctionDialog, arguments, options);
+*/
+- (void)dialog:(CDVInvokedUrlCommand *)command
+{
+	DLog(@"%@:%@", kFunctionDialog, command.arguments);
 
 	// The first argument in the arguments parameter is the callbackId.
-	[self.callbackIds setValue:[arguments pop] forKey:kFunctionDialog];
-	NSString *method = [options objectForKey:@"method"] ?: @"apprequests";
-	NSMutableDictionary* params = [options objectForKey:@"params"] ?: [[NSMutableDictionary alloc] init];
+	[self.callbackIds setValue:command.callbackId forKey:kFunctionDialog];
+	NSString *method = [command.arguments objectAtIndex:0];
+	NSMutableDictionary *params = [command.arguments objectAtIndex:1];
 
-	[self.facebook dialog:method andParams:params andDelegate:self];
+	Facebook *facebook = [[Facebook alloc] initWithAppId:[FBSession defaultAppID] andDelegate:[[FBSessionDelegateDummy alloc] init]];
+
+	[facebook dialog:method andParams:params andDelegate:self];
 }
 
-
+/*
 - (void)logouts:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
 	DLog(@"logout:%@\n withDict:%@", arguments, options);
 
@@ -112,102 +114,6 @@ NSString *const kFunctionReauthorize = @"reauthorizeSession";
 
 }
 */
-
-/*
- * Callback for session changes.
- */
-- (void)sessionStateChanged:(FBSession *)session
-  	state:(FBSessionState) state
-  	error:(NSError *)error
-{
-    DLog(@"session: %@", [session description]);
-    NSLog(@"error code: %d", error.code);
-    NSLog(@"error: %@", [error localizedDescription]);
-
-    /*
-	Cada vez que se hace login() se emiten dos eventos. el primero es un FBSessionStateClosed y 
-	el segundo un FBSessionStateOpen. Ambos sin error.
-
-	Cuando la app:
-	esta desactivada en los settings de iphone
-	state:FBSessionStateClosedLoginFailed
-	error.code: 2
-
-	no ha sido autorizada en fb y no estan los setting  en el iphone
-	lanza el mensaje de autenticacion
-
-
-    */
-
-    return;
-	CDVPluginResult* pluginResult = nil;
-    NSString* callbackId = [self.callbackIds valueForKey:@"login"];
-
-    switch (state) {
-        case FBSessionStateOpen:
-            if (!error) {
-                // We have a valid session
-		
-				pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-				[self success:pluginResult callbackId:callbackId];
-                NSLog(@"User session found");
-            }else{
-
-	    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]];
-		        [self error:pluginResult callbackId:callbackId];
-
-            }
-            break;
-        case FBSessionStateClosed:
-        case FBSessionStateClosedLoginFailed:
-            [FBSession.activeSession closeAndClearTokenInformation];
-    	
-    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT messageAsString:[error localizedDescription]];
-	        [self error:pluginResult callbackId:callbackId];
-        
-            break;
-        default:
-    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_INVALID_ACTION messageAsString:[error localizedDescription]];
-	        [self error:pluginResult callbackId:callbackId];
-            break;
-    }
-/*
-FBSessionStateCreated = 0,
-FBSessionStateCreatedTokenLoaded = 1,
-FBSessionStateCreatedOpening = 2,
- FBSessionStateOpen = 1 | FB_SESSIONSTATEOPENBIT,
-FBSessionStateOpenTokenExtended = 2 | FB_SESSIONSTATEOPENBIT,
- FBSessionStateClosedLoginFailed = 1 | FB_SESSIONSTATETERMINALBIT,
- FBSessionStateClosed = 2 | FB_SESSIONSTATETERMINALBIT,
-*/
-    // [[NSNotificationCenter defaultCenter]
-    //  postNotificationName:FBSessionStateChangedNotification
-    //  object:session];
-    
-    // if (error) {
-    //     UIAlertView *alertView = [[UIAlertView alloc]
-    //                               initWithTitle:@"Error"
-    //                               message:error.localizedDescription
-    //                               delegate:nil
-    //                               cancelButtonTitle:@"OK"
-    //                               otherButtonTitles:nil];
-    //     [alertView show];
-    // }
-}
-
-/*
- * Opens a Facebook session and optionally shows the login UX.
- */
-- (BOOL)openSessionWithAllowLoginUI:(BOOL)allowLoginUI withPermissions:(NSArray *)permissions
-{
-    return [FBSession openActiveSessionWithPublishPermissions:permissions
-    			defaultAudience: 30
-                                              allowLoginUI:allowLoginUI
-                                         completionHandler:^(FBSession *session, FBSessionState state, NSError *error) {
-                                             [self sessionStateChanged:session state:state error:error];
-                                         }
-            ];
-}
 
 - (void) handleOpenURL:(NSNotification *)notification
 {
@@ -342,58 +248,19 @@ Takes the permissions array and if it should shows UILogin
 
 }
 
-/*
+
 #pragma mark - < FBSessionDelegate >
 
-- (void)fbDidLogin {
-	DLog(@"fbDidLogin");
+// - (void)fbDidLogin {}
 
-	// Update session information in NSUserDefaults
-	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-	[defaults setObject:[self.facebook accessToken] forKey:@"FBAccessTokenKey"];
-	[defaults setObject:[self.facebook expirationDate] forKey:@"FBExpirationDateKey"];
-	[defaults synchronize];
+// - (void)fbDidNotLogin:(BOOL)cancelled {}
 
-	// Perform initial graph request
-	[self.facebookRequests setValue:[self.facebook requestWithGraphPath:@"me" andDelegate:self]
-							 forKey:[self.callbackIds valueForKey:@"login"]];
+// - (void)fbDidExtendToken:(NSString *)accessToken expiresAt:(NSDate *)expiresAt {}
 
-}
+// - (void)fbDidLogout {}
 
-- (void)fbDidNotLogin:(BOOL)cancelled {
-	DLog(@"fbDidNotLogin:%@", cancelled ? @"YES" : @"NO");
+// - (void)fbSessionInvalidated {}
 
-	NSDictionary *result = [[NSDictionary alloc] initWithObjectsAndKeys:@"1", @"cancelled", @"User dissmissed the login", @"message", nil];
-	CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:result];
-	[self writeJavascript:[pluginResult toErrorCallbackString:[self.callbackIds valueForKey:@"login"]]];
-}
-
-- (void)fbDidExtendToken:(NSString *)accessToken expiresAt:(NSDate *)expiresAt {
-	DLog(@"fbDidExtendToken:%@\n expiresAt:%@", accessToken, expiresAt);
-
-	// Update session information in NSUserDefaults
-	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-	[defaults setObject:accessToken forKey:@"FBAccessTokenKey"];
-	[defaults setObject:expiresAt forKey:@"FBExpirationDateKey"];
-	[defaults synchronize];
-
-}
-
-- (void)fbDidLogout {
-
-	// Cleared stored session information
-	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-	[defaults removeObjectForKey:@"FBAccessTokenKey"];
-	[defaults removeObjectForKey:@"FBExpirationDateKey"];
-	[defaults synchronize];
-
-	CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-	[self writeJavascript:[pluginResult toSuccessCallbackString:[self.callbackIds valueForKey:@"logout"]]];
-
-}
-
-- (void)fbSessionInvalidated {}
-*/
 #pragma mark - < FBRequestDelegate >
 
 /**
@@ -469,35 +336,45 @@ Takes the permissions array and if it should shows UILogin
 /**
  * Called when a UIServer Dialog is closed.
  */
-/*- (void)dialogDidNotComplete:(FBDialog *)dialog {
+- (void)dialogDidNotComplete:(FBDialog *)dialog {
 	DLog(@"dialogDidNotComplete:%@", dialog);
 
-	NSDictionary *result = [[NSDictionary alloc] initWithObjectsAndKeys:@"1", @"cancelled", @"User dissmissed the dialog", @"message", nil];
+	NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys: @"1", @"cancelled", @"User dissmissed the dialog", @"message", nil];
 	CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:result];
-	[self writeJavascript:[pluginResult toErrorCallbackString:[self.callbackIds valueForKey:kFunctionDialog]]];
+	[self error:pluginResult callbackId:[self.callbackIds valueForKey:kFunctionDialog]];
 }
-*/
+
 /**
  * Called when a UIServer Dialog successfully returns. Use this callback
  * instead of dialogDidComplete: to properly handle successful shares/sends
  * that return ID data back.
  */
-/*- (void)dialogCompleteWithUrl:(NSURL *)url {
+- (void)dialogCompleteWithUrl:(NSURL *)url {
 	if (![url query]) {
 		DLog(@"User canceled dialog or there was an error");
 		[self dialogDidNotComplete:nil];
-	}
-	else {
-		NSDictionary *result = [self parseURLParams:[url query]];
-		CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:result];
-		[self writeJavascript:[pluginResult toSuccessCallbackString:[self.callbackIds valueForKey:kFunctionDialog]]];
+		
+	} else {
+		CDVPluginResult* pluginResult;
+		NSDictionary *result = nil;
+		@try {
+			result = [self parseURLParams:[url query]];	
+
+	    } @catch (id exception) {
+	        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_JSON_EXCEPTION messageAsString:[exception reason]];
+	        [self error:pluginResult callbackId:[self.callbackIds valueForKey:kFunctionDialog]];
+	        return;
+	    }
+		
+		pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:result];
+		[self success:pluginResult callbackId:[self.callbackIds valueForKey:kFunctionDialog]];
 	}
 }
-*/
+
 /**
  * Helper method to parse URL query parameters. The original definition is from the Hackbook example.
  */
-/*- (NSDictionary *)parseURLParams:(NSString *)query {
+- (NSDictionary *)parseURLParams:(NSString *)query {
 	NSArray *pairs = [query componentsSeparatedByString:@"&"];
 	NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
 	for (NSString *pair in pairs) {
@@ -508,5 +385,5 @@ Takes the permissions array and if it should shows UILogin
 	}
 	return params;
 }
-*/
+
 @end
