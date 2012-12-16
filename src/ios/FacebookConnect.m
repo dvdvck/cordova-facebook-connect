@@ -2,118 +2,86 @@
 //  FacebookConnect.m
 //
 // Created by Olivier Louvignes on 2012-06-25.
+// Modified by David Retana on 2012-12-15
 //
 // Copyright 2012 Olivier Louvignes. All rights reserved.
 // MIT Licensed
 
 #import "FacebookConnect.h"
-#import <Cordova/JSONKit.h>
-#import "FBSessionDelegateDummy.h"
-// #import "Facebook.h"
+// #import <FacebookSDK/FacebookSDK.h>
 
-NSString *const kFunctionDialog = @"dialog";
+//Until dialog component gets updated
+#import "Facebook.h"
+#import "FBDialogDelegate.h"
 
 @implementation FacebookConnect
 
-@synthesize callbackIds = _callbackIds;
-@synthesize facebookRequests = _facebookRequests;
-@synthesize dateFormatter = _dateFormatter;
 @synthesize openSessionCallback, reauthorizeSessionCallback;
 
-#pragma mark - Custom getters & setters
-
-- (NSMutableDictionary *)callbackIds {
-	if(_callbackIds == nil) {
-		_callbackIds = [[NSMutableDictionary alloc] init];
-	}
-	return _callbackIds;
-}
-- (NSMutableDictionary *)facebookRequests {
-	if(_facebookRequests == nil) {
-		_facebookRequests = [[NSMutableDictionary alloc] init];
-	}
-	return _facebookRequests;
-}
-- (NSDateFormatter *)dateFormatter {
-	if(_dateFormatter == nil) {
-		_dateFormatter = [[NSDateFormatter alloc] init];
-		[_dateFormatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
-		[_dateFormatter setDateFormat:@"yyyy-MM-dd'T'HH:mm:ssZ"];
-	}
-	return _dateFormatter;
-}
-
 #pragma mark - Cordova plugin interface
-/*
-- (void)logins:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
-	ALog(@"login:%@\n withDict:%@", arguments, options);
 
-	// The first argument in the arguments parameter is the callbackId.
-	[self.callbackIds setValue:[arguments pop] forKey:@"login"];
-	NSMutableArray *permissions = [options objectForKey:@"permissions"] ?: [[NSMutableArray alloc] init];
+/**
+Perform a request to a graph path with params and http method specified
+*/
+- (void)requestWithGraphPath:(CDVInvokedUrlCommand *)command
+{
+	DLog(@"requestWithGraphPath:%@", command.arguments);
 
-//	if([options objectForKey:@"appId"]) {
-//		self.appId = [options objectForKey:@"appId"];
-		// Check for any stored session update Facebook session information
-		NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-		if ([defaults objectForKey:@"FBAccessTokenKey"] && [defaults objectForKey:@"FBExpirationDateKey"]) {
-			self.facebook.accessToken = [defaults objectForKey:@"FBAccessTokenKey"];
-			self.facebook.expirationDate = [defaults objectForKey:@"FBExpirationDateKey"];
-		}
-//	}
-
-	if (![self.facebook isSessionValid]) {
-		[self.facebook authorize:permissions];
-	} else {
-		[self.facebookRequests setValue:[self.facebook requestWithGraphPath:@"me" andDelegate:self]
-								 forKey:[self.callbackIds valueForKey:@"login"]];
+	if( ![FBSession openActiveSessionWithAllowLoginUI:NO] ){
+		NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys:@"-1", @"code", @"error", @"domain", @"There is not an active session. Open it with openSession method.", @"description",nil];
+	    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_INVALID_ACTION messageAsDictionary:info];
+        [self error:pluginResult callbackId:command.callbackId];
+		return;
 	}
 
+	NSString *path = [command.arguments objectAtIndex:0];
+	NSMutableDictionary *params = [command.arguments objectAtIndex:1];
+	NSString *httpMethod = [command.arguments objectAtIndex:2];
+
+	[FBRequestConnection startWithGraphPath:path parameters:params HTTPMethod:httpMethod
+        completionHandler:^(FBRequestConnection *connection, id result, NSError *error){
+		    DLog(@"%@", [result description]);
+		    CDVPluginResult *pluginResult;
+
+    		if(error){
+        		NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInteger:[error code]], @"code", [error domain], @"domain", [error localizedDescription], @"description",nil];
+	    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:info];
+		        [self error:pluginResult callbackId:command.callbackId];
+
+		    }else{
+				NSMutableDictionary *mutableResult = [result mutableCopy];
+				pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:mutableResult];
+				[self success:pluginResult callbackId:command.callbackId];
+		    }
+        }
+    ];
 }
 
-- (void)requestWithGraphPath:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
-	DLog(@"requestWithGraphPath:%@\n withDict:%@", arguments, options);
-
-	// The first argument in the arguments parameter is the callbackId.
-	[self.callbackIds setValue:[arguments pop] forKey:@"requestWithGraphPath"];
-	NSString *path = [options objectForKey:@"path"] ?: @"me";
-	NSMutableDictionary *params = [options objectForKey:@"options"] ?: [[NSMutableDictionary alloc] init];
-	NSString *httpMethod = [options objectForKey:@"httpMethod"] ?: @"GET";
-
-	// Make sure we pass a string for a limit key
-	if([params valueForKey:@"limit"]) [params setValue:[NSString stringWithFormat:@"%d", [[params valueForKey:@"limit"] integerValue]] forKey:@"limit"];
-
-	FBRequest *request = [self.facebook requestWithGraphPath:path andParams:params andHttpMethod:httpMethod andDelegate:self];
-
-	[self.facebookRequests setValue:request
-							 forKey:[self.callbackIds valueForKey:@"requestWithGraphPath"]];
-
-}
+/**
+Show a web dialog. This dialog uses legacy Facebook SDK
 */
 - (void)dialog:(CDVInvokedUrlCommand *)command
 {
-	DLog(@"%@:%@", kFunctionDialog, command.arguments);
+	DLog(@"%@", command.arguments);
+	NSLog(@"%@", command.callbackId);
 
-	// The first argument in the arguments parameter is the callbackId.
-	[self.callbackIds setValue:command.callbackId forKey:kFunctionDialog];
+	if( ![FBSession openActiveSessionWithAllowLoginUI:NO] ){
+		NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys:@"-1", @"code", @"error", @"domain", @"There is not an active session. Open it with openSession method.", @"description",nil];
+	    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_INVALID_ACTION messageAsDictionary:info];
+        [self error:pluginResult callbackId:command.callbackId];
+		return;
+	}
+
 	NSString *method = [command.arguments objectAtIndex:0];
 	NSMutableDictionary *params = [command.arguments objectAtIndex:1];
 
-	Facebook *facebook = [[Facebook alloc] initWithAppId:[FBSession defaultAppID] andDelegate:[[FBSessionDelegateDummy alloc] init]];
+	Facebook *facebook = [[Facebook alloc] initWithAppId:FBSession.activeSession.appID andDelegate:nil];
+	facebook.accessToken = FBSession.activeSession.accessToken;
+	facebook.expirationDate = FBSession.activeSession.expirationDate;
 
-	[facebook dialog:method andParams:params andDelegate:self];
+    FBDialogDelegate *dialogDelegate = [[FBDialogDelegate alloc] initWithCDVPlugin: self andCallbackId:command.callbackId];
+	[facebook dialog:method andParams:params andDelegate:dialogDelegate];    
 }
-
-/*
-- (void)logouts:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
-	DLog(@"logout:%@\n withDict:%@", arguments, options);
-
-	// The first argument in the arguments parameter is the callbackId.
-	[self.callbackIds setValue:[arguments pop] forKey:@"logout"];
-	[self.facebook logout];
-
-}
-*/
 
 - (void) handleOpenURL:(NSNotification *)notification
 {
@@ -170,9 +138,9 @@ Takes the permissions array and if it should shows UILogin
 	        	}
                 CDVPluginResult *pluginResult;
 	        	if(error){
-		    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-		    	    	messageAsDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
-	    					[NSNumber numberWithInt:state], @"state", [error localizedDescription], @"error", nil]];
+	        		NSMutableDictionary *info = [NSMutableDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInteger:[error code]], @"code", [error domain], @"domain", [error localizedDescription], @"description",nil];
+	        		[info setObject:[NSNumber numberWithInt:state] forKey:@"sessionState"];
+		    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:info];
 			        [self error:pluginResult callbackId:command.callbackId];
 
 	            }else{
@@ -186,8 +154,9 @@ Takes the permissions array and if it should shows UILogin
 
 	        }
 	    ];
-    } @catch (id exception) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_JSON_EXCEPTION messageAsString:[exception reason]];
+    } @catch (NSException *exception) {
+    	NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys: [exception name], @"code", @"exception", @"domain", [exception reason], @"description", nil];
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_JSON_EXCEPTION messageAsDictionary:info];
         [self error:pluginResult callbackId:command.callbackId];
     }
 
@@ -204,6 +173,9 @@ Takes the permissions array and if it should shows UILogin
     [self success:pluginResult callbackId:command.callbackId];
 }
 
+/**
+Only reauthorize if there is an active session or at least there were access tokens cached
+*/
 - (void) reauthorizeSession:(CDVInvokedUrlCommand *)command
 {
     CDVPluginResult *pluginResult;
@@ -220,8 +192,8 @@ Takes the permissions array and if it should shows UILogin
 		}
         CDVPluginResult *pluginResult;
     	if(error){
-    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
-    	    	messageAsDictionary:[NSDictionary dictionaryWithObjectsAndKeys: [error localizedDescription], @"error", nil]];
+    		NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithInteger:[error code]], @"code", [error domain], @"domain", [error localizedDescription], @"description", nil];
+    	    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:info];
 	        [self error:pluginResult callbackId:command.callbackId];
 
         }else{
@@ -235,155 +207,19 @@ Takes the permissions array and if it should shows UILogin
 	};
 
     @try {
+    	[FBSession openActiveSessionWithAllowLoginUI:NO];
 		if(audience == FBSessionDefaultAudienceNone){
 			[FBSession.activeSession reauthorizeWithReadPermissions:permissions completionHandler: reauthorizeHandler];
 
 		}else{
 			[FBSession.activeSession reauthorizeWithPublishPermissions:permissions defaultAudience:audience completionHandler: reauthorizeHandler];
 		}
-    } @catch (id exception) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_JSON_EXCEPTION messageAsString:[exception reason]];
+    } @catch (NSException *exception) {
+		NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys: [exception name], @"code", @"exception", @"domain", [exception reason], @"description", nil];
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_JSON_EXCEPTION messageAsDictionary:info];
         [self error:pluginResult callbackId:command.callbackId];
     }
 
-}
-
-
-#pragma mark - < FBSessionDelegate >
-
-// - (void)fbDidLogin {}
-
-// - (void)fbDidNotLogin:(BOOL)cancelled {}
-
-// - (void)fbDidExtendToken:(NSString *)accessToken expiresAt:(NSDate *)expiresAt {}
-
-// - (void)fbDidLogout {}
-
-// - (void)fbSessionInvalidated {}
-
-#pragma mark - < FBRequestDelegate >
-
-/**
- * Called when the Facebook API request has returned a response. This callback
- * gives you access to the raw response. It's called before
- * (void)request:(FBRequest *)request didLoad:(id)result,
- * which is passed the parsed response object.
- */
-- (void)request:(FBRequest *)request didReceiveResponse:(NSURLResponse *)response {
-	//DLog(@"request:%@\n didReceiveResponse:%@", request, response);
-}
-
-/**
- * Called when a request returns and its response has been parsed into
- * an object. The resulting object may be a dictionary, an array, a string,
- * or a number, depending on the format of the API response. If you need access
- * to the raw response, use:
- *
- * (void)request:(FBRequest *)request
- *      didReceiveResponse:(NSURLResponse *)response
- */
-/*
-- (void)request:(FBRequest *)request didLoad:(id)result {
-	DLog(@"request:%@\n didLoad:%@", request, result);
-
-	// Loop through facebookRequests to find matching one
-	NSString *matchingCallbackId = nil;
-	for (id key in self.facebookRequests) {
-		id value = [self.facebookRequests objectForKey:key];
-		if(request == value) matchingCallbackId = key;
-	}
-
-	if ([result isKindOfClass:[NSDictionary class]]) {
-
-		NSMutableDictionary *mutableResult = [result mutableCopy];
-		[mutableResult setObject:self.facebook.accessToken forKey:@"accessToken"];
-		[mutableResult setObject:[self.dateFormatter stringFromDate:self.facebook.expirationDate] forKey:@"expirationDate"];
-
-		CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:mutableResult];
-		[self writeJavascript:[pluginResult toSuccessCallbackString:matchingCallbackId]];
-
-	} else if ([result isKindOfClass:[NSData class]]) {
-		DLog(@"Unsupported result... todo! %@", result);
-		//[profilePicture release];
-		//profilePicture = [[UIImage alloc] initWithData: result];
-	} else {
-		DLog(@"Unsupported result... todo! %@", result);
-	}
-
-};
-*/
-/**
- * Called when an error prevents the Facebook API request from completing
- * successfully.
- */
-/*
-- (void)request:(FBRequest *)request didFailWithError:(NSError *)error {
-	DLog(@"request:%@\n didFailWithError:%@", request, error);
-
-	// Loop through facebookRequests to find matching one
-	NSString *matchingCallbackId = nil;
-	for (id key in self.facebookRequests) {
-		id value = [self.facebookRequests objectForKey:key];
-		if(request == value) matchingCallbackId = key;
-	}
-
-	CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]];
-	[self writeJavascript:[pluginResult toErrorCallbackString:matchingCallbackId]];
-};
-*/
-#pragma mark - < FBDialogDelegate >
-
-/**
- * Called when a UIServer Dialog is closed.
- */
-- (void)dialogDidNotComplete:(FBDialog *)dialog {
-	DLog(@"dialogDidNotComplete:%@", dialog);
-
-	NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys: @"1", @"cancelled", @"User dissmissed the dialog", @"message", nil];
-	CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:result];
-	[self error:pluginResult callbackId:[self.callbackIds valueForKey:kFunctionDialog]];
-}
-
-/**
- * Called when a UIServer Dialog successfully returns. Use this callback
- * instead of dialogDidComplete: to properly handle successful shares/sends
- * that return ID data back.
- */
-- (void)dialogCompleteWithUrl:(NSURL *)url {
-	if (![url query]) {
-		DLog(@"User canceled dialog or there was an error");
-		[self dialogDidNotComplete:nil];
-		
-	} else {
-		CDVPluginResult* pluginResult;
-		NSDictionary *result = nil;
-		@try {
-			result = [self parseURLParams:[url query]];	
-
-	    } @catch (id exception) {
-	        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_JSON_EXCEPTION messageAsString:[exception reason]];
-	        [self error:pluginResult callbackId:[self.callbackIds valueForKey:kFunctionDialog]];
-	        return;
-	    }
-		
-		pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:result];
-		[self success:pluginResult callbackId:[self.callbackIds valueForKey:kFunctionDialog]];
-	}
-}
-
-/**
- * Helper method to parse URL query parameters. The original definition is from the Hackbook example.
- */
-- (NSDictionary *)parseURLParams:(NSString *)query {
-	NSArray *pairs = [query componentsSeparatedByString:@"&"];
-	NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
-	for (NSString *pair in pairs) {
-		NSArray *kv = [pair componentsSeparatedByString:@"="];
-		NSString *key = [[kv objectAtIndex:0] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-		NSString *val = [[kv objectAtIndex:1] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-		[params setObject:val forKey:key];
-	}
-	return params;
 }
 
 @end

@@ -125,26 +125,43 @@
 	 * @param {Function} [callback] Is an optional callback method that receives the results of the API call.
 	 */
 	FacebookConnect.prototype.requestWithGraphPath = function(path, options, httpMethod, callback) {
-		var method;
+		var config = [];
 
-		if(!path) path = "me";
+		path = path || 'me';
+
 		if(typeof options === 'function') {
 			callback = options;
 			options = {};
 			httpMethod = undefined;
 		}
+
 		if (typeof httpMethod === 'function') {
 			callback = httpMethod;
 			httpMethod = undefined;
 		}
+
 		httpMethod = httpMethod || 'GET';
+
+		//path
+		config.push(path);
+
+		//params
+		config.push((function(options){
+			if(options.limit && typeof options.limit !== 'string'){
+				options.limit = options.limit + '';
+			}
+			return options;
+		}(options)));
+
+		//httpMethod
+		config.push(httpMethod);
 
 		var _callback = function() {
 			//console.log('FacebookConnect.requestWithGraphPath: %o', arguments);
 			if(typeof callback == 'function') callback.apply(null, arguments);
 		};
 
-		return cordova.exec(_callback, _callback, service, 'requestWithGraphPath', [{path: path, options: options, httpMethod: httpMethod}]);
+		return cordova.exec(_callback, _callback, service, 'requestWithGraphPath', config);
 
 	};
 

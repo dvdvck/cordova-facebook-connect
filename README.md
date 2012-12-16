@@ -1,6 +1,25 @@
 # Cordova Facebook Connect Plugin #
 by [Olivier Louvignes](http://olouv.com)
 
+## Branch iosSDK3_1
+Upgraded login workflow matching [facebook recommendation](https://developers.facebook.com/docs/howtos/login-with-facebook-using-ios-sdk/)
+
+Facebook ios SDK 3.1.1 ready! :)
+
+* Repeat the step 2 and 3 for `PLUGIN SETUP FOR IOS`
+
+* Verify `FBDialogDelegate.m` is listed on compile sources in build phases section for the target application (XCode)
+
+* Update javascript signature methods as follows:
+    1. `login` -> `openSession` You dont need to provide you APPID from here anymore
+    2. `logout` -> `closeSession`
+    3. `initWithAppId` was obsolete
+
+* Make profit of this new method
+    1. `reauthorize` Updates the current FB Session with the specified permissions and audience
+
+* Be happy 
+
 ## DESCRIPTION ##
 
 * This plugin provides a simple way to use Facebook Graph API in Cordova.
@@ -119,6 +138,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Contributors :
 
 * [Jon Buffington](http://blog.jon.buffington.name/) added dialog support for iOS.
+
+* [David Retana](http://twitter.com/dvdvck) Upgraded iOS workflow to 3.1.1
 
 Inspired by :
 
